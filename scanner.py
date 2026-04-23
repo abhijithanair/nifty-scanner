@@ -254,6 +254,10 @@ def process_stock(stock, seen_signals):
 def run_scanner():
     IST = timezone(timedelta(hours=5, minutes=30))
     print("Scanner started at", datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"))
+    send_alert(
+    f"⏱️ <b>Scanner Running</b>\n"
+    f"🕒 Time: {datetime.now().strftime('%d %b %Y %H:%M')}"
+    )
 
     if not is_market_open():
         print("Market closed. Skipping scan.")
