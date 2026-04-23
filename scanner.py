@@ -54,7 +54,8 @@ from smc_swing import SMCSwing   # your file
 # MAIN SCANNER
 # ==============================
 def run_scanner():
-
+    send_alert("✅ Scanner is running (test message)")
+    
     if not is_market_open():
         print("Market closed. Skipping scan.")
         return
