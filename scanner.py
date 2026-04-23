@@ -256,7 +256,7 @@ def run_scanner():
     print("Scanner started at", datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"))
     send_alert(
     f"⏱️ <b>Scanner Running</b>\n"
-    f"🕒 Time: {datetime.now().strftime('%d %b %Y %H:%M')}"
+    f"🕒 Time: {datetime.now(IST).strftime('%d %b %Y %H:%M')}"
     )
 
     if not is_market_open():
