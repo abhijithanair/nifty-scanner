@@ -1,5 +1,5 @@
 yfinance
 pandas
 numpy
-pandas_ta
+pandas-ta
 requests
