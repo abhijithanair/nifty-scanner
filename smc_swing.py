@@ -21,11 +21,6 @@ import math
 import pandas as pd
 import numpy as np
 
-try:
-    import pandas_ta as ta
-except ImportError:
-    raise ImportError("Install pandas_ta:  pip install pandas_ta")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -155,12 +150,28 @@ class SMCSwing:
         cfg = self.cfg
         n   = len(df)
 
-        # Pre-compute indicators (vectorised)
-        atr14   = df.ta.atr(length=14)
-        ema20   = df.ta.ema(length=20)
-        ema50   = df.ta.ema(length=50)
-        ema200  = df.ta.ema(length=200)
-        vwap    = self._daily_vwap(df)
+        # EMA
+        df["ema20"] = df["close"].ewm(span=20).mean()
+        df["ema50"] = df["close"].ewm(span=50).mean()
+        df["ema200"] = df["close"].ewm(span=200).mean()
+
+        # ATR
+        df["tr"] = np.maximum(
+            df["high"] - df["low"],
+            np.maximum(
+                abs(df["high"] - df["close"].shift()),
+                abs(df["low"] - df["close"].shift())
+            )
+        )
+        df["atr"] = df["tr"].rolling(14).mean()
+
+        # Assign variables (same names as before)
+        atr14  = df["atr"]
+        ema20  = df["ema20"]
+        ema50  = df["ema50"]
+        ema200 = df["ema200"]
+
+        vwap = self._daily_vwap(df)
 
         # State
         swing_high    = Pivot()

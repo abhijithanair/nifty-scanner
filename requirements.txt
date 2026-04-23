@@ -1,5 +1,4 @@
 yfinance
 pandas
 numpy
-git+https://github.com/twopirllc/pandas-ta.git
 requests
