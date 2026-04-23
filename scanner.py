@@ -54,6 +54,10 @@ from smc_swing import SMCSwing   # your file
 # MAIN SCANNER
 # ==============================
 def run_scanner():
+    # 🔍 DEBUG HERE
+    print("TOKEN:", TELEGRAM_TOKEN)
+    print("CHAT_ID:", CHAT_ID)
+    
     send_alert("🚀 TEST FROM GITHUB ACTIONS")
     
     
