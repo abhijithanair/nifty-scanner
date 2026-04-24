@@ -67,6 +67,20 @@ def get_nifty500_stocks():
         print(f"Failed to fetch Nifty 500: {e}")
         return fallback_stocks()
 
+def calculate_atr(df, period=14):
+    high = df["high"]
+    low = df["low"]
+    close = df["close"]
+
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+
+    atr = tr.rolling(period).mean()
+    return atr.iloc[-1]
+
 # ==============================
 # TELEGRAM
 # ==============================
@@ -182,7 +196,7 @@ def score_swing(df):
 # SUPPORT / RESISTANCE LEVELS
 # ==============================
 def get_sr_levels(df):
-    recent = df.tail(60)
+    recent = df.tail(10)  # tighter for swing
     support = round(recent["low"].min(), 2)
     resistance = round(recent["high"].max(), 2)
     return support, resistance
@@ -219,7 +233,7 @@ def process_stock(stock, seen_signals):
 
         score, signal_type, rsi = score_swing(df)
 
-        if score < 55 or signal_type is None:
+        if score < 60 or signal_type is None:
             return None
 
         key = f"{stock}_{signal_type}"
@@ -227,9 +241,21 @@ def process_stock(stock, seen_signals):
             return None
 
         support, resistance = get_sr_levels(df)
+        atr = calculate_atr(df)
 
-        sl = round(support * 0.98, 2)
-        tp = round(ltp + (ltp - sl) * 2, 2)  # 1:2 RR
+        # --- Hybrid SL (ATR + Structure) ---
+        sl_atr = ltp - 1.2 * atr
+        sl_structure = support * 0.995
+
+        sl = round(max(sl_atr, sl_structure), 2)
+
+        # --- Ensure SL is not too wide (max 8%) ---
+        max_sl = ltp * 0.92
+        sl = max(sl, round(max_sl, 2))
+
+        # --- TP with resistance cap ---
+        tp_rr = ltp + (ltp - sl) * 2
+        tp = round(min(tp_rr, resistance), 2)
 
         message = (
             f"<b>{signal_type}: {stock.replace('.NS', '')}</b>\n"
