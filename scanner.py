@@ -225,6 +225,67 @@ def get_sr_levels(df):
 # ==============================
 def process_stock(stock, seen_signals):
     try:
+        time.sleep(0.1)
+
+        df = yf.download(
+            stock,
+            period=PERIOD,
+            interval=INTERVAL,
+            progress=False,
+            auto_adjust=True
+        )
+
+        if df.empty or len(df) < 210:
+            return None
+
+        # Flatten columns
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        df.columns = [c.lower() for c in df.columns]
+
+        ltp = round(df["close"].iloc[-1], 2)
+
+        if ltp > LTP_MAX:
+            return None
+
+        # ======================
+        # SMC SIGNAL
+        # ======================
+        signal, entry, sl, tp, structure = get_smc_signal(df)
+
+        if signal != 1:  # Only bullish swing trades
+            return None
+
+        key = f"{stock}_{structure}"
+        if key in seen_signals:
+            return None
+
+        # Fallback safety (sometimes SMC gives weird values)
+        if sl is None or tp is None or sl >= ltp:
+            return None
+
+        # Ensure RR >= 1.5
+        rr = (tp - ltp) / (ltp - sl)
+        if rr < 1.5:
+            return None
+
+        message = (
+            f"<b>📊 SMC Swing: {stock.replace('.NS', '')}</b>\n"
+            f"Structure:  {structure}\n"
+            f"LTP:        ₹{ltp}\n"
+            f"Entry:      ₹{round(entry,2)}\n"
+            f"SL:         ₹{round(sl,2)}\n"
+            f"TP:         ₹{round(tp,2)}\n"
+            f"RR:         {round(rr,2)}\n"
+        )
+
+        return rr, key, message
+
+    except Exception as e:
+        print(f"{stock} error: {e}")
+        return None
+    try:
         time.sleep(0.1)  # avoid yfinance rate limiting
 
         df = yf.download(
