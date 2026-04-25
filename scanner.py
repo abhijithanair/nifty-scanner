@@ -6,6 +6,7 @@ import time
 from io import StringIO
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from smc_swing import SMCSwing
 
 # ==============================
 # CONFIG
@@ -80,6 +81,24 @@ def calculate_atr(df, period=14):
 
     atr = tr.rolling(period).mean()
     return atr.iloc[-1]
+
+def get_smc_signal(df):
+    try:
+        smc = SMCSwing(df)
+        result = smc.run()
+
+        last = result.iloc[-1]
+
+        signal = last["signal"]   # 1 = buy, -1 = sell
+        sl = last["sl"]
+        tp = last["tp"]
+        structure = last["structure"]
+
+        return signal, sl, tp, structure
+
+    except Exception as e:
+        print("SMC error:", e)
+        return 0, None, None, None
 
 # ==============================
 # TELEGRAM
@@ -232,8 +251,17 @@ def process_stock(stock, seen_signals):
             return None
 
         score, signal_type, rsi = score_swing(df)
+        smc_signal, smc_sl, smc_tp, smc_structure = get_smc_signal(df)
 
-        if score < 60 or signal_type is None:
+        if (score < 55 and smc_signal == 0) or signal_type is None:
+            return None
+        
+        # Boost score if SMC agrees
+        if smc_signal == 1 and signal_type in ["📈 Breakout Setup", "🚀 Momentum Swing"]:
+            score += 15
+
+        # Ignore bearish signals (since you're only buying swings)
+        if smc_signal == -1:
             return None
 
         key = f"{stock}_{signal_type}"
@@ -243,29 +271,40 @@ def process_stock(stock, seen_signals):
         support, resistance = get_sr_levels(df)
         atr = calculate_atr(df)
 
-        # --- Hybrid SL (ATR + Structure) ---
+        # --- Default SL ---
         sl_atr = ltp - 1.2 * atr
         sl_structure = support * 0.995
 
-        sl = round(max(sl_atr, sl_structure), 2)
+        sl = max(sl_atr, sl_structure)
 
-        # --- Ensure SL is not too wide (max 8%) ---
-        max_sl = ltp * 0.92
-        sl = max(sl, round(max_sl, 2))
+        # --- If SMC available → override ---
+        if smc_signal == 1 and smc_sl is not None:
+            sl = max(sl, smc_sl)  # safer SL
 
-        # --- TP with resistance cap ---
+        # --- Cap SL (avoid wide SL) ---
+        sl = max(sl, ltp * 0.92)
+        sl = round(sl, 2)
+
+        # --- TP ---
         tp_rr = ltp + (ltp - sl) * 2
-        tp = round(min(tp_rr, resistance), 2)
+        tp = min(tp_rr, resistance)
+
+        # --- If SMC TP exists ---
+        if smc_signal == 1 and smc_tp is not None:
+            tp = max(tp, smc_tp)
+
+        tp = round(tp, 2)
 
         message = (
             f"<b>{signal_type}: {stock.replace('.NS', '')}</b>\n"
             f"LTP:        ₹{ltp}\n"
             f"Score:      {score}/100\n"
             f"RSI:        {rsi}\n"
+            f"SMC:        {smc_structure if smc_signal else 'None'}\n"
             f"Support:    ₹{support}\n"
             f"Resistance: ₹{resistance}\n"
             f"SL:         ₹{sl}\n"
-            f"TP:         ₹{tp} (1:2 RR)\n"
+            f"TP:         ₹{tp} (1:2+ RR)\n"
         )
 
         return score, key, message
