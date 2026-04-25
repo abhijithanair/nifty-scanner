@@ -281,10 +281,6 @@ def run_scanner():
     IST = timezone(timedelta(hours=5, minutes=30))
     print("Scanner started at", datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"))
 
-    if not is_market_open():
-        print("Market closed. Skipping scan.")
-        return
-
     stocks = get_nifty500_stocks()
     seen_signals = load_seen()
     results = []
