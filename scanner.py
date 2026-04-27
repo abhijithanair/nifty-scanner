@@ -236,6 +236,9 @@ def process_stock(stock, seen_signals):
         # LTP filter
         if ltp > LTP_MAX:
             return None
+        
+        if is_over_extended(df, max_run_percent=22, lookback_days=20):  # Tune 20-25%
+            return None
 
         score, signal_type, rsi = score_swing(df)
 
@@ -279,6 +282,25 @@ def process_stock(stock, seen_signals):
     except Exception as e:
         print(f"{stock} error: {e}")
         return None
+    
+def is_over_extended(df, max_run_percent=25, lookback_days=20):
+    """Return True if stock has run up too far recently (avoid chasing)."""
+    close = df["close"]
+    if len(close) < lookback_days + 10:
+        return True  # Not enough data -> skip
+    
+    recent_high = close.iloc[-lookback_days:].max()
+    recent_low = close.iloc[-lookback_days:].min()
+    run_from_low = (close.iloc[-1] - recent_low) / recent_low * 100
+    
+    # Also check from 50-day low or ATR-based extension
+    atr = calculate_atr(df, period=14)
+    distance_from_50low = (close.iloc[-1] - close.iloc[-50:].min()) / atr if atr > 0 else 0
+    
+    # Flag as over-extended if:
+    # - Big run in last 20 days (>25%)
+    # - Or very far from recent low relative to ATR (e.g., >8-10 ATRs)
+    return run_from_low > max_run_percent or distance_from_50low > 10
 
 # ==============================
 # MAIN SCANNER
