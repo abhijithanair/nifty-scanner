@@ -10,8 +10,6 @@ jobs:
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
-        with:
-            ref: main
 
       - name: Setup Python
         uses: actions/setup-python@v5
