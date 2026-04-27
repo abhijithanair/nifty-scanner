@@ -1,9 +1,6 @@
 name: Nifty Scanner
 
 on:
-  schedule:
-    - cron: "*/15 9-15 * * 1-5"
-      timezone: "Asia/Kolkata"
   workflow_dispatch:
 
 jobs:

@@ -147,7 +147,11 @@ def score_swing(df):
     rs = gain / loss
     rsi = 100 - (100 / (1 + rs))
     rsi_val = rsi.iloc[-1]
-    rsi_ok = 40 <= rsi_val <= 65
+    rsi_strong = rsi_val >= 60
+
+    # Strong move in last 3 days
+    recent_return = (close.iloc[-1] - close.iloc[-4]) / close.iloc[-4]
+    momentum_move = recent_return > 0.04   # 4% move in 3 days
 
     # --- Volume Surge ---
     avg_vol = volume.rolling(20).mean().iloc[-1]
@@ -160,7 +164,7 @@ def score_swing(df):
 
     # --- 52-week high breakout ---
     week52_high = high.rolling(252).max().iloc[-1]
-    near_breakout = ltp >= 0.95 * week52_high
+    breakout = ltp >= week52_high * 0.98
 
     # --- Higher highs & higher lows (last 5 candles) ---
     recent_highs = high.iloc[-5:]
@@ -170,23 +174,25 @@ def score_swing(df):
         recent_lows.iloc[-1] > recent_lows.iloc[0]
     )
 
+    # Relative strength vs market (simple proxy)
+    market_return = (close.iloc[-1] - close.iloc[-10]) / close.iloc[-10]
+    strong_stock = market_return > 0.05
+
     # --- Scoring ---
     score = 0
-    if trend_up:            score += 30
+    if trend_up:            score += 25
     if price_above_ema20:   score += 10
-    if rsi_ok:              score += 20
-    if volume_surge:        score += 15
-    if near_ema20:          score += 10
-    if near_breakout:       score += 10
-    if hh_hl:               score += 5
+    if rsi_strong:          score += 20
+    if volume_surge:        score += 20
+    if breakout:            score += 15
+    if momentum_move:       score += 10
+    if strong_stock:        score += 10
 
     # --- Signal Type ---
-    if near_breakout and trend_up and volume_surge:
-        signal_type = "📈 Breakout Setup"
-    elif near_ema20 and trend_up and rsi_ok:
-        signal_type = "🔄 Pullback to EMA"
-    elif trend_up and hh_hl:
-        signal_type = "🚀 Momentum Swing"
+    if breakout and volume_surge and momentum_move:
+        signal_type = "🚀 Strong Breakout"
+    elif momentum_move and rsi_strong and volume_surge:
+        signal_type = "🔥 Momentum Continuation"
     else:
         signal_type = None
 
@@ -280,10 +286,6 @@ def process_stock(stock, seen_signals):
 def run_scanner():
     IST = timezone(timedelta(hours=5, minutes=30))
     print("Scanner started at", datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"))
-
-    if not is_market_open():
-        print("Market closed. Skipping scan.")
-        return
 
     stocks = get_nifty500_stocks()
     seen_signals = load_seen()
